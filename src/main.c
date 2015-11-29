@@ -5,6 +5,10 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include <errno.h>
+
+#include "stream_utils.h"
+
 #define USER_STR_LIM 100
 #define STDIN 0
 #define STDOUT 1
@@ -26,6 +30,7 @@ void execute_cmd(char *args[]);
 #define TKN_EOF        6
 
 int pfd[2];
+int e_pfd[2];
 #define READ  (0)
 #define WRITE (1)
 
@@ -38,12 +43,13 @@ init_shared_pip(void)
         close(pfd[WRITE]);
         exit(-1);
     }
-}
 
-void
-pry_write(char *mes, int fd)
-{
-    write(fd, mes, strlen(mes));
+    if (pipe(e_pfd) < 0) {
+        perror("pipe");
+        close(pfd[READ]);
+        close(pfd[WRITE]);
+        exit(-1);
+    }
 }
 
 int
@@ -77,19 +83,21 @@ main(int argc, char *argv[])
     chdir("/");
     char *args1[2] = { "ls", NULL };
     char *args2[3] = { "grep", "m", NULL };
-    printf("%d\n", pfd[0]);
-    pry_write("send from child", pfd[WRITE]);
+
+    stream_utils_write("send from child", pfd[WRITE]);
+    stream_utils_read(pfd[READ]);
 
 
     execute_to_pip(args1);
-    // char buf[128];
-		// read(pfd[0], buf, sizeof(char) * 128);
-		// printf("child=[%s]\n", buf);
+    // stream_utils_read(pfd[READ]);
+
+    execute_from_pip(args2);
+
+    // stream_utils_read(pfd[READ]);
+
     // close(STDIN);
-    init_shared_pip();
-    char buf[128];
-    read(pfd[0], buf, sizeof(char) * 128);
-    printf("child=[%s]\n", buf);
+    // init_shared_pip();
+
     // dup2(pfd[READ], STDIN);
     // char s;
     // s = getc(STDIN);
@@ -109,12 +117,10 @@ execute_to_pip(char *args[])
         exit(-1);
     }
     else if (pid == 0) {
-        close(STDOUT);
-        dup2(pfd[WRITE], STDOUT);
-        close(pfd[WRITE]);
+        stream_utils_attach_skt(pfd[WRITE], STDOUT);
         if (execvp(args[0], args) < 0) {
-             printf("*** ERROR: exec failed\n");
-             exit(1);
+            printf("*** ERROR: exec failed\n");
+            exit(1);
         }
     }
     else {
@@ -133,20 +139,12 @@ execute_from_pip(char *args[])
         exit(-1);
     }
     else if (pid == 0) {
-        close(STDIN);
-        dup2(pfd[READ], STDIN);
-        char *s;
-        scanf("%s", s);
-        fprintf(stdout, "エラー: ファイルがオープンできません: %s\n", "sss");
-        // char c;
-        // c = getc(STDIN);
-        // printf("%c\n", c);
-        // char buf[128];
-    		// read(pfd[0], buf, sizeof(char) * 128);
-    		// printf("child=[%s]\n", buf);
+        stream_utils_attach_skt(pfd[READ], STDIN);
+        stream_utils_read(STDIN);
     }
     else {
         wait(&status);
+        printf("%d\n", status);
     }
 }
 // void execute_with_pipe(char *args[], char *args2[])
