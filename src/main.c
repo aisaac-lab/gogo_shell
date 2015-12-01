@@ -8,6 +8,7 @@
 #include <errno.h>
 
 #include "stream_utils.h"
+#include "get_tokens.h"
 
 #define USER_STR_LIM 100
 #define STDIN 0
@@ -18,14 +19,6 @@ typedef int check_t;
 check_t running_p = 1;
 
 void execute_cmd(char *args[], int from_pipe, int to_pipe);
-
-#define TKN_NORMAL     0
-#define TKN_REDIR_IN   1
-#define TKN_REDIR_OUT  2
-#define TKN_PIPE       3
-#define TKN_BG         4
-#define TKN_EOL        5
-#define TKN_EOF        6
 
 int pfd[2];
 int e_pfd[2];
@@ -95,6 +88,16 @@ main(int argc, char *argv[])
 
 
     stream_utils_read(e_pfd[READ]);
+
+    char *str = "ls -al   |   grep   a > <";
+    int token_nums[MAX_NUM_OF_TOKEN];
+    char tokens[MAX_NUM_OF_TOKEN][MAX_LEN_OF_TOKEN];
+    int count_of_tokens = get_tokens(str, tokens, token_nums);
+
+    for (int i=0; i<count_of_tokens; i++) {
+        printf("%d\n", token_nums[i]);
+        printf("%s\n", tokens[i]);
+    }
 
     // close(STDIN);
     // init_shared_pip();
