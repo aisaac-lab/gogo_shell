@@ -17,9 +17,7 @@
 typedef int check_t;
 check_t running_p = 1;
 
-void execute_to_pip(char *args[]);
-void execute_from_pip(char *args[]);
-void execute_cmd(char *args[]);
+void execute_cmd(char *args[], int from_pipe, int to_pipe);
 
 #define TKN_NORMAL     0
 #define TKN_REDIR_IN   1
@@ -82,18 +80,21 @@ main(int argc, char *argv[])
     init_shared_pip();
     chdir("/");
     char *args1[2] = { "ls", NULL };
-    char *args2[3] = { "grep", "m", NULL };
+    char *args2[3] = { "gredp", "m", NULL };
 
     stream_utils_write("send from child", pfd[WRITE]);
     stream_utils_read(pfd[READ]);
 
 
-    execute_to_pip(args1);
+    execute_cmd(args1, 0, 1);
+    // stream_utils_attach_skt(pfd[WRITE], STDERR);
+      // fprintf(stderr, "2\n");
+    // execute_cmd(args2, 0, 0);
     // stream_utils_read(pfd[READ]);
+    // stream_utils_read(STDIN);
 
-    execute_from_pip(args2);
 
-    // stream_utils_read(pfd[READ]);
+    stream_utils_read(e_pfd[READ]);
 
     // close(STDIN);
     // init_shared_pip();
@@ -108,7 +109,7 @@ main(int argc, char *argv[])
 }
 
 void
-execute_to_pip(char *args[])
+execute_cmd(char *args[], int from_pipe, int to_pipe)
 {
     pid_t pid;
     int   status;
@@ -117,70 +118,14 @@ execute_to_pip(char *args[])
         exit(-1);
     }
     else if (pid == 0) {
-        stream_utils_attach_skt(pfd[WRITE], STDOUT);
+        if (to_pipe)   stream_utils_attach_skt(pfd[WRITE], STDOUT);
+        if (from_pipe) stream_utils_attach_skt(pfd[READ], STDIN);
+
+        stream_utils_attach_skt(e_pfd[WRITE], STDERR);
+        fprintf(stderr, "エラー: ファイルがオープンできません\n");
         if (execvp(args[0], args) < 0) {
             printf("*** ERROR: exec failed\n");
             exit(1);
-        }
-    }
-    else {
-        wait(&status);
-    }
-}
-
-void
-execute_from_pip(char *args[])
-{
-    pid_t pid;
-    int   status;
-    char *user_str;
-    if ((pid = fork()) < 0) {
-        printf("*** ERROR: forking child process failed\n");
-        exit(-1);
-    }
-    else if (pid == 0) {
-        stream_utils_attach_skt(pfd[READ], STDIN);
-        stream_utils_read(STDIN);
-    }
-    else {
-        wait(&status);
-        printf("%d\n", status);
-    }
-}
-// void execute_with_pipe(char *args[], char *args2[])
-// {
-//     pid_t  pid;
-//     int    stat1, stat2;
-//
-//     if (fork() == 0) {
-        // close(STDOUT);
-        // dup2(pfd[WRITE], STDOUT);
-        // close(pfd[READ]); close(pfd[WRITE]);
-        // execvp(args1[0], args1);
-//     }
-//     if (fork() == 0) {
-        // close(STDIN);
-        // dup2(pfd[READ], STDIN);
-        // close(pfd[READ]); close(pfd[WRITE]);
-        // execvp(args2[0], args2);
-//     }
-//     close(pfd[READ]); close(pfd[WRITE]);
-//     wait(&stat1); wait(&stat2);
-//   // kill(getpid(), 9);
-// }
-
-void execute_cmd(char *args[])
-{
-    pid_t pid;
-    int   status;
-    if ((pid = fork()) < 0) {
-        perror("pipe");
-        exit(-1);
-    }
-    else if (pid == 0) {
-        if (execvp(args[0], args) < 0) {
-             printf("*** ERROR: exec failed\n");
-             exit(1);
         }
     }
     else {
