@@ -1,33 +1,38 @@
+#include <sys/wait.h>
+#include <unistd.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
 #include "get_tokens.h"
 
 int
-get_tokens(char *str, char tokens[MAX_NUM_OF_TOKEN][MAX_LEN_OF_TOKEN], int token_nums[MAX_NUM_OF_TOKEN]) {
-    int len_of_str = strlen(str);
+mysh_get_tokens(char *line, TokenInfo *token_infos)
+{
+    int len_of_str = strlen(line);
     int count_of_tokens = 0;
     for (int i=0; i<len_of_str; i++) {
-        char token[MAX_LEN_OF_TOKEN] = "";
-        int token_num = TKN_SPC;
-
-        if (is_special_char(str[i])) {
-            token_num = token_num_of_special_char(str[i]);
-            token[0] = str[i];
-        } else if (is_space(str[i])) {
+        char *token;
+        int token_id;
+        token = malloc(sizeof(char*));
+        char current_char = line[i];
+        printf("===%c\n", current_char);
+        if (is_special_char(current_char)) {
+            token_id = token_num_of_special_char(current_char);
+            token[0] = current_char;
+        } else if (is_space(current_char)) {
         } else  {
             int current_i = i;
-            for (; i<len_of_str && !is_special_char(str[i]); i++){
-                token[i-current_i] = str[i];
+            for (; i<len_of_str && !is_special_char(line[i]); i++){
+                token[i-current_i] = line[i];
             }
             i--;
-            token_num = TKN_NORMAL;
+            token_id = TKN_NORMAL;
         }
 
-        if (token_num != TKN_SPC) {
-            for(int k=0; token[k]; k++) {
-                tokens[count_of_tokens][k] = token[k];
-            }
-            token_nums[count_of_tokens] = token_num;
+        if (token_id != TKN_SPC) {
+            TokenInfo token_info = { token_id, token };
+            token_infos[count_of_tokens] = token_info;
             count_of_tokens++;
         }
     }

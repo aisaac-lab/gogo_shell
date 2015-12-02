@@ -1,137 +1,160 @@
-#include <stdio.h>
-#include <stdlib.h>
-
+#include <sys/wait.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#include <sys/types.h>
 
-#include <errno.h>
-
-#include "stream_utils.h"
+#include "read_line.h"
 #include "get_tokens.h"
+#include "parse_cmd.h"
+#include "process_utils.h"
 
-#define USER_STR_LIM 100
 #define STDIN 0
 #define STDOUT 1
 #define STDERR 2
 
-typedef int check_t;
-check_t running_p = 1;
+#define PIPE_READ 0
+#define PIPE_WRITE 1
 
-void execute_cmd(char *args[], int from_pipe, int to_pipe);
+int mysh_cd(char **args);
+int mysh_help(char **args);
+int mysh_exit(char **args);
 
-int pfd[2];
-int e_pfd[2];
-#define READ  (0)
-#define WRITE (1)
+int
+is_next_pipe(int i, int token_count, TokenInfo *token_infos);
 
-void
-init_shared_pip(void)
+char *builtin_str[] = {
+    "cd",
+    "help",
+    "exit"
+};
+
+int (*builtin_func[]) (char **) = {
+    &mysh_cd,
+    &mysh_help,
+    &mysh_exit
+};
+
+int mysh_num_builtins() {
+    return sizeof(builtin_str) / sizeof(char *);
+}
+
+int mysh_cd(char **args)
 {
-    if (pipe(pfd) < 0) {
-        perror("pipe");
-        close(pfd[READ]);
-        close(pfd[WRITE]);
-        exit(-1);
+    if (args[1] == NULL) {
+        fprintf(stderr, "mysh: expected argument to \"cd\"\n");
+    } else {
+        if (chdir(args[1]) != 0) {
+            perror("mysh");
+        }
+    }
+    return 1;
+}
+
+int mysh_help(char **args)
+{
+    int i;
+    printf("Stephen Brennan's mysh\n");
+    printf("Type program names and arguments, and hit enter.\n");
+    printf("The following are built in:\n");
+
+    for (i = 0; i < mysh_num_builtins(); i++) {
+        printf("  %s\n", builtin_str[i]);
     }
 
-    if (pipe(e_pfd) < 0) {
-        perror("pipe");
-        close(pfd[READ]);
-        close(pfd[WRITE]);
-        exit(-1);
+    printf("Use the man command for information on other programs.\n");
+    return 1;
+}
+
+int mysh_exit(char **args)
+{
+    return 0;
+}
+
+
+int mysh_execute(int in, int out, char **args)
+{
+    int i;
+
+    if (args[0] == NULL) return 1;
+
+    for (i = 0; i < mysh_num_builtins(); i++) {
+        if (strcmp(args[0], builtin_str[i]) == 0) {
+            return (*builtin_func[i])(args);
+        }
     }
+
+    return mysh_launch(in, out, args);
+}
+
+void mysh_loop(void)
+{
+    char *line;
+    TokenInfo *token_infos;
+    int status;
+
+    do {
+        printf("$ ");
+        line = mysh_read_line();
+
+        token_infos = malloc(sizeof(TokenInfo*) * 100);
+        int token_count = mysh_get_tokens(line, token_infos);
+        int in = STDIN;
+        int out = -1;
+        char **args;
+        for (int i=0; i<token_count; i++) {
+            TokenInfo token_info = token_infos[i];
+            int fd[2];
+            pipe (fd);
+
+            if (i == token_count - 1) out = STDOUT;
+
+            if (token_info.token_id == TKN_NORMAL) {
+                args = malloc(sizeof(char*) * 100);
+                args = parse_cmd(token_info.token);
+
+
+                for (int k=0; args[k]; k++) {
+                    printf("%s\n", args[k]);
+
+                }
+                if (is_next_pipe(i, token_count, token_infos)) {
+                    out = fd[PIPE_WRITE];
+                    status = mysh_execute(in, out, args);
+                    close (fd[PIPE_WRITE]);
+                    in = fd [PIPE_READ];
+                } else {
+                    status = mysh_execute(in, out, args);
+                }
+
+                free(args);
+            }
+
+            // in = fd[0];
+            // char *args[] = { "grep", "build", NULL };
+            // status = mysh_execute(in, STDOUT, args);
+        }
+
+        free(line);
+        free(token_infos);
+    } while (status);
 }
 
 int
-main(int argc, char *argv[])
+is_next_pipe(int i, int token_count, TokenInfo *token_infos)
 {
-    char *user_str;
-    // int fd;
-    // char filename[80];
-    // char *user_str = "ls -al | sdfkjfj < | > sdfjdf &";
-    // int po;
-    // while(user_str[po]) {
-    //     printf("%c\n", user_str[po]);
-    //     po++;
-    // }
-
-    // while (running_p) {
-    //     printf("$ ");
-    //     if (fgets(user_str, USER_STR_LIM, stdin) == NULL) {
-    //         printf("*** ERROR: something wrong: %s\n", user_str);
-    //         exit(1);
-    //     }
-    //     char *args1[2] = { "ls", NULL };
-    //     char *args2[3] = { "grep", "m", NULL };
-    //
-    //     // execute_with_pipe(args1, args2);
-    //     chdir("/");
-    //     execute_cmd(args1);
-    //     printf("\n");
-    // }
-    init_shared_pip();
-    chdir("/");
-    char *args1[2] = { "ls", NULL };
-    char *args2[3] = { "gredp", "m", NULL };
-
-    stream_utils_write("send from child", pfd[WRITE]);
-    stream_utils_read(pfd[READ]);
-
-
-    execute_cmd(args1, 0, 1);
-    // stream_utils_attach_skt(pfd[WRITE], STDERR);
-      // fprintf(stderr, "2\n");
-    // execute_cmd(args2, 0, 0);
-    // stream_utils_read(pfd[READ]);
-    // stream_utils_read(STDIN);
-
-
-    stream_utils_read(e_pfd[READ]);
-
-    char *str = "ls -al   |   grep   a > <";
-    int token_nums[MAX_NUM_OF_TOKEN];
-    char tokens[MAX_NUM_OF_TOKEN][MAX_LEN_OF_TOKEN];
-    int count_of_tokens = get_tokens(str, tokens, token_nums);
-
-    for (int i=0; i<count_of_tokens; i++) {
-        printf("%d\n", token_nums[i]);
-        printf("%s\n", tokens[i]);
-    }
-
-    // close(STDIN);
-    // init_shared_pip();
-
-    // dup2(pfd[READ], STDIN);
-    // char s;
-    // s = getc(STDIN);
-    // fprintf(stdout, "エラー: ファイルがオープンできません: %s\n", "sss");
-
-
-    // execute_with_pipe(args1, args2);
+    return (i+1)<token_count && token_infos[i+1].token_id == TKN_PIPE;
 }
 
-void
-execute_cmd(char *args[], int from_pipe, int to_pipe)
+int
+is_prev_pipe(int i, int token_count, TokenInfo *token_infos)
 {
-    pid_t pid;
-    int   status;
-    if ((pid = fork()) < 0) {
-        printf("*** ERROR: forking child process failed\n");
-        exit(-1);
-    }
-    else if (pid == 0) {
-        if (to_pipe)   stream_utils_attach_skt(pfd[WRITE], STDOUT);
-        if (from_pipe) stream_utils_attach_skt(pfd[READ], STDIN);
+    return 0<=(i-1) && token_infos[i-1].token_id == TKN_PIPE;
+}
 
-        stream_utils_attach_skt(e_pfd[WRITE], STDERR);
-        fprintf(stderr, "エラー: ファイルがオープンできません\n");
-        if (execvp(args[0], args) < 0) {
-            printf("*** ERROR: exec failed\n");
-            exit(1);
-        }
-    }
-    else {
-        wait(&status);
-    }
+int
+main(void)
+{
+    mysh_loop();
+    return EXIT_SUCCESS;
 }
