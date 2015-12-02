@@ -14,9 +14,8 @@ mysh_get_tokens(char *line, TokenInfo *token_infos)
     for (int i=0; i<len_of_str; i++) {
         char *token;
         int token_id;
-        token = malloc(sizeof(char*));
+        token = malloc(sizeof(char*) * 100);
         char current_char = line[i];
-        printf("===%c\n", current_char);
         if (is_special_char(current_char)) {
             token_id = token_num_of_special_char(current_char);
             token[0] = current_char;

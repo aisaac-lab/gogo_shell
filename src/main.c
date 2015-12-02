@@ -112,12 +112,6 @@ void mysh_loop(void)
             if (token_info.token_id == TKN_NORMAL) {
                 args = malloc(sizeof(char*) * 100);
                 args = parse_cmd(token_info.token);
-
-
-                for (int k=0; args[k]; k++) {
-                    printf("%s\n", args[k]);
-
-                }
                 if (is_next_pipe(i, token_count, token_infos)) {
                     out = fd[PIPE_WRITE];
                     status = mysh_execute(in, out, args);
@@ -126,13 +120,8 @@ void mysh_loop(void)
                 } else {
                     status = mysh_execute(in, out, args);
                 }
-
                 free(args);
             }
-
-            // in = fd[0];
-            // char *args[] = { "grep", "build", NULL };
-            // status = mysh_execute(in, STDOUT, args);
         }
 
         free(line);
