@@ -3,7 +3,6 @@
 
 int mysh_num_builtins(void);
 int mysh_cd(char **args);
-int mysh_help(char **args);
 int mysh_exit(char **args);
 
 char *builtin_str[];

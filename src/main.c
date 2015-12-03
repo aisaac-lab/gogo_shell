@@ -8,30 +8,27 @@
 #include "get_tokens.h"
 #include "parse_cmd.h"
 #include "process_utils.h"
-
-#define STDIN 0
-#define STDOUT 1
-#define STDERR 2
+#include "file_utils.h"
 
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
 int mysh_cd(char **args);
-int mysh_help(char **args);
 int mysh_exit(char **args);
 
 int
-is_next_pipe(int i, int token_count, TokenInfo *token_infos);
+is_next(int token_id, int i, int token_count, TokenInfo *token_infos);
+
+int
+is_prev(int token_id, int i, int token_count, TokenInfo *token_infos);
 
 char *builtin_str[] = {
     "cd",
-    "help",
     "exit"
 };
 
 int (*builtin_func[]) (char **) = {
     &mysh_cd,
-    &mysh_help,
     &mysh_exit
 };
 
@@ -48,21 +45,6 @@ int mysh_cd(char **args)
             perror("mysh");
         }
     }
-    return 1;
-}
-
-int mysh_help(char **args)
-{
-    int i;
-    printf("Stephen Brennan's mysh\n");
-    printf("Type program names and arguments, and hit enter.\n");
-    printf("The following are built in:\n");
-
-    for (i = 0; i < mysh_num_builtins(); i++) {
-        printf("  %s\n", builtin_str[i]);
-    }
-
-    printf("Use the man command for information on other programs.\n");
     return 1;
 }
 
@@ -99,7 +81,7 @@ void mysh_loop(void)
 
         token_infos = malloc(sizeof(TokenInfo*) * 100);
         int token_count = mysh_get_tokens(line, token_infos);
-        int in = STDIN;
+        int in = STDIN_FILENO;
         int out = -1;
         char **args;
         for (int i=0; i<token_count; i++) {
@@ -107,16 +89,23 @@ void mysh_loop(void)
             int fd[2];
             pipe (fd);
 
-            if (i == token_count - 1) out = STDOUT;
+            if (i == token_count - 1) out = STDOUT_FILENO;
 
             if (token_info.token_id == TKN_NORMAL) {
                 args = malloc(sizeof(char*) * 100);
                 args = parse_cmd(token_info.token);
-                if (is_next_pipe(i, token_count, token_infos)) {
+                if (is_next(TKN_PIPE, i, token_count, token_infos)) {
                     out = fd[PIPE_WRITE];
                     status = mysh_execute(in, out, args);
                     close (fd[PIPE_WRITE]);
-                    in = fd [PIPE_READ];
+                    in = fd[PIPE_READ];
+                } else if (is_next(TKN_REDIR_IN, i, token_count, token_infos)) {
+                } else if (is_prev(TKN_REDIR_OUT, i, token_count, token_infos)) {
+                    write_from_stdout(token_info.token);
+                } else if (is_prev(TKN_REDIR_IN, i, token_count, token_infos)) {
+                    status = mysh_execute(in, out, args);
+                } else if (is_next(TKN_REDIR_OUT, i, token_count, token_infos)) {
+                    status = mysh_execute(in, STDIN_FILENO, args);
                 } else {
                     status = mysh_execute(in, out, args);
                 }
@@ -130,20 +119,30 @@ void mysh_loop(void)
 }
 
 int
-is_next_pipe(int i, int token_count, TokenInfo *token_infos)
+is_next(int token_id, int i, int token_count, TokenInfo *token_infos)
 {
-    return (i+1)<token_count && token_infos[i+1].token_id == TKN_PIPE;
+    return (i+1)<token_count && token_infos[i+1].token_id == token_id;
 }
 
 int
-is_prev_pipe(int i, int token_count, TokenInfo *token_infos)
+is_prev(int token_id, int i, int token_count, TokenInfo *token_infos)
 {
-    return 0<=(i-1) && token_infos[i-1].token_id == TKN_PIPE;
+    return 0<=(i-1) && token_infos[i-1].token_id == token_id;
+}
+
+void sig_handler(int p_signame)
+{
+    printf("\n");
 }
 
 int
 main(void)
 {
+
+    if (signal(SIGINT, sig_handler) == SIG_ERR) {
+        printf("シグナルの設定が出来ませんでした。終了します\n");
+        exit(1);
+    }
     mysh_loop();
     return EXIT_SUCCESS;
 }

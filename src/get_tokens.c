@@ -20,6 +20,7 @@ mysh_get_tokens(char *line, TokenInfo *token_infos)
             token_id = token_num_of_special_char(current_char);
             token[0] = current_char;
         } else if (is_space(current_char)) {
+            token_id = TKN_SPC;
         } else  {
             int current_i = i;
             for (; i<len_of_str && !is_special_char(line[i]); i++){

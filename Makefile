@@ -1,4 +1,4 @@
-OBJS = build/main.o build/read_line.o build/get_tokens.o build/parse_cmd.o build/process_utils.o
+OBJS = build/main.o build/read_line.o build/get_tokens.o build/parse_cmd.o build/process_utils.o build/file_utils.o
 #  build/stream_utils.o
 CC = gcc
 CFLAGS = -std=c99 -g -c
@@ -24,6 +24,10 @@ build/parse_cmd.o : src/parse_cmd.c
 
 build/process_utils.o : src/process_utils.c
 	$(CC) $(CFLAGS) src/process_utils.c -o build/process_utils.o
+
+build/file_utils.o : src/file_utils.c
+	$(CC) $(CFLAGS) src/file_utils.c -o build/file_utils.o
+
 
 build:
 	mkdir -p build/
