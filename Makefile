@@ -1,5 +1,5 @@
-OBJS = build/main.o build/read_line.o build/get_tokens.o build/parse_cmd.o build/process_utils.o build/file_utils.o
-#  build/stream_utils.o
+OBJS = build/main.o build/read_line.o build/get_tokens.o build/parse_cmd.o build/process_utils.o build/file_utils.o build/builtin_func.o
+
 CC = gcc
 CFLAGS = -std=c99 -g -c
 LFLAGS = -std=c99 -g
@@ -8,10 +8,13 @@ $(PROGRAM) : $(OBJS)
 	$(CC) -o $(PROGRAM) $^
 
 gsh: $(OBJS)
-	$(CC) $(LFLAGS) $(OBJS) -o gsh
+	$(CC) $(LFLAGS) $(OBJS) -o mysh
 
 build/main.o : src/main.c
 	$(CC) $(CFLAGS) src/main.c -o build/main.o
+
+build/builtin_func.o : src/builtin_func.c
+	$(CC) $(CFLAGS) src/builtin_func.c -o build/builtin_func.o
 
 build/read_line.o : src/read_line.c
 	$(CC) $(CFLAGS) src/read_line.c -o build/read_line.o

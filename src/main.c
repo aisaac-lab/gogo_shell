@@ -1,9 +1,11 @@
+// 61113749 田中和希
 #include <sys/wait.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "builtin_func.h"
 #include "read_line.h"
 #include "get_tokens.h"
 #include "parse_cmd.h"
@@ -13,14 +15,7 @@
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
-int mysh_cd(char **args);
-int mysh_exit(char **args);
-
-int
-is_next(int token_id, int i, int token_count, TokenInfo *token_infos);
-
-int
-is_prev(int token_id, int i, int token_count, TokenInfo *token_infos);
+#define NUM_BUILDIN_FUNC 2
 
 char *builtin_str[] = {
     "cd",
@@ -32,27 +27,11 @@ int (*builtin_func[]) (char **) = {
     &mysh_exit
 };
 
-int mysh_num_builtins() {
-    return sizeof(builtin_str) / sizeof(char *);
-}
+int
+is_next(int token_id, int i, int token_count, TokenInfo *token_infos);
 
-int mysh_cd(char **args)
-{
-    if (args[1] == NULL) {
-        fprintf(stderr, "mysh: expected argument to \"cd\"\n");
-    } else {
-        if (chdir(args[1]) != 0) {
-            perror("mysh");
-        }
-    }
-    return 1;
-}
-
-int mysh_exit(char **args)
-{
-    return 0;
-}
-
+int
+is_prev(int token_id, int i, int token_count, TokenInfo *token_infos);
 
 int mysh_execute(int in, int out, char **args)
 {
@@ -60,7 +39,7 @@ int mysh_execute(int in, int out, char **args)
 
     if (args[0] == NULL) return 1;
 
-    for (i = 0; i < mysh_num_builtins(); i++) {
+    for (i = 0; i < NUM_BUILDIN_FUNC; i++) {
         if (strcmp(args[0], builtin_str[i]) == 0) {
             return (*builtin_func[i])(args);
         }
@@ -73,7 +52,7 @@ void mysh_loop(void)
 {
     char *line;
     TokenInfo *token_infos;
-    int status;
+    int is_running = 1;
 
     do {
         printf("$ ");
@@ -96,18 +75,18 @@ void mysh_loop(void)
                 args = parse_cmd(token_info.token);
                 if (is_next(TKN_PIPE, i, token_count, token_infos)) {
                     out = fd[PIPE_WRITE];
-                    status = mysh_execute(in, out, args);
+                    mysh_execute(in, out, args);
                     close (fd[PIPE_WRITE]);
                     in = fd[PIPE_READ];
                 } else if (is_next(TKN_REDIR_IN, i, token_count, token_infos)) {
-                } else if (is_prev(TKN_REDIR_OUT, i, token_count, token_infos)) {
-                    write_from_stdout(token_info.token);
-                } else if (is_prev(TKN_REDIR_IN, i, token_count, token_infos)) {
-                    status = mysh_execute(in, out, args);
+                    mysh_execute(open_for_rdir_in(token_infos[i+2].token), out, args);
+                    i += 2;
                 } else if (is_next(TKN_REDIR_OUT, i, token_count, token_infos)) {
-                    status = mysh_execute(in, STDIN_FILENO, args);
+                    printf("%s\n", token_infos[i].token);
+                    mysh_execute(in, open_for_rdir_out(token_infos[i+2].token), args);
+                    i += 2;
                 } else {
-                    status = mysh_execute(in, out, args);
+                    mysh_execute(in, out, args);
                 }
                 free(args);
             }
@@ -115,7 +94,7 @@ void mysh_loop(void)
 
         free(line);
         free(token_infos);
-    } while (status);
+    } while (is_running);
 }
 
 int
@@ -130,17 +109,21 @@ is_prev(int token_id, int i, int token_count, TokenInfo *token_infos)
     return 0<=(i-1) && token_infos[i-1].token_id == token_id;
 }
 
-void sig_handler(int p_signame)
+void sigint_handler(int p_signame)
 {
     printf("\n");
 }
 
+void sigtstp_handler(int p_signame)
+{
+}
+
+
 int
 main(void)
 {
-
-    if (signal(SIGINT, sig_handler) == SIG_ERR) {
-        printf("シグナルの設定が出来ませんでした。終了します\n");
+    if (signal(SIGTSTP, sigtstp_handler) == SIG_ERR) {
+        printf("mysh: something wrong with binding sigtstp_handler\n");
         exit(1);
     }
     mysh_loop();
