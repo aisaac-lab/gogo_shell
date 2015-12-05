@@ -1,4 +1,4 @@
-a=`echo "ls | grep s | grep r | grep c" | ./gsh`
+a=`echo "ls | grep s | grep r | grep c" | ./mysh`
 
 if [ "$a" = "src
 $ " ]; then
@@ -7,7 +7,7 @@ else
     echo "NG"
 fi;
 
-b=`echo "cat < test.txt" | ./gsh`
+b=`echo "cat < test.txt" | ./mysh`
 if [ "$b" = "abcdefg
 $ " ]; then
     echo "OK"

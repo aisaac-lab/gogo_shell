@@ -116,14 +116,19 @@ void sigint_handler(int p_signame)
 
 void sigtstp_handler(int p_signame)
 {
+    // printf("===%d\n", getpid());
 }
-
 
 int
 main(void)
 {
     if (signal(SIGTSTP, sigtstp_handler) == SIG_ERR) {
         printf("mysh: something wrong with binding sigtstp_handler\n");
+        exit(1);
+    }
+
+    if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+        printf("mysh: something wrong with binding sigint_handler\n");
         exit(1);
     }
     mysh_loop();

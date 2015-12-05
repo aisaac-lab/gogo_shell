@@ -4,13 +4,11 @@ CC = gcc
 CFLAGS = -std=c99 -g -c
 LFLAGS = -std=c99 -g
 
-$(PROGRAM) : $(OBJS)
-	$(CC) -o $(PROGRAM) $^
-
 gsh: $(OBJS)
-	$(CC) $(LFLAGS) $(OBJS) -o mysh
+	$(CC) $(LFLAGS) $(OBJS) -o gsh
 
 build/main.o : src/main.c
+	mkdir -p build/
 	$(CC) $(CFLAGS) src/main.c -o build/main.o
 
 build/builtin_func.o : src/builtin_func.c
@@ -30,7 +28,6 @@ build/process_utils.o : src/process_utils.c
 
 build/file_utils.o : src/file_utils.c
 	$(CC) $(CFLAGS) src/file_utils.c -o build/file_utils.o
-
 
 build:
 	mkdir -p build/
